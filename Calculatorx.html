@@ -1,0 +1,181 @@
+import sys
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+html_code = """
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculatorx</title>
+<style>
+body {
+    margin:0; padding:20px;
+    background:#000; color:#fff; font-family:'Bahnschrift',sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; user-select:none;
+}
+
+/* Дисплей */
+#display {
+    font-size:40px; text-align:right; 
+    margin-bottom:15px; padding:10px; 
+    border:1px solid #444; border-radius:10px; 
+    min-height:50px; width:100%; box-sizing:border-box; 
+    background:#000; color:#fff;
+    user-select:none;
+}
+#display::selection { background: none; } /* убираем подсветку текста */
+
+/* Сетка цифр и DEL/AC */
+.digits-grid {
+    display:grid;
+    grid-template-columns: repeat(4, 70px);
+    grid-auto-rows:70px;
+    gap:15px;
+    justify-content:center;
+}
+
+/* Кнопки */
+button {
+    border:none; border-radius:10px; font-family:'Bahnschrift'; cursor:pointer;
+    font-size:28px; transition: background 0.1s, color 0.1s; outline:none; box-shadow:none;
+}
+.number-btn { background:#000; color:#fff; }
+.number-btn:active { background:#fff; color:#000; }
+.delete-btn, .ac-btn { background:#fff; color:#000; }
+.delete-btn:active, .ac-btn:active { background:#000; color:#fff; }
+
+/* Операторы */
+.operators-row { display:flex; justify-content:center; flex-wrap:wrap; margin-top:15px; }
+.operators-row button { width:60px; height:60px; margin:7px; border-radius:10px; background:#fff; color:#000; }
+.operators-row button:active { background:#000; color:#fff; }
+
+/* Валюта */
+#currency { text-align:center; color:white; margin-top:15px; cursor:pointer; font-size:18px; }
+#currency span.triangle { font-size:6px; margin-left:2px; vertical-align:middle; }
+
+/* Конвертер */
+#converter { display:none; margin-top:15px; text-align:center; opacity:0; transition:opacity 0.3s; }
+#converter input, #converter select, #converter button {
+    margin-top:8px; font-size:16px; border-radius:8px; text-align:center;
+}
+#converter input, #converter select { width:60%; padding:6px; background:black; color:white; border:1px solid white; }
+#converter button { width:40%; padding:6px; background:white; color:black; border:none; cursor:pointer; font-weight:bold; }
+#convertedResult { margin-top:10px; font-size:20px; color:white; }
+</style>
+</head>
+<body>
+
+<div id="display">0</div>
+
+<!-- Сетка цифр и DEL/AC -->
+<div class="digits-grid">
+    <!-- 1–9 -->
+    <button class="number-btn" data-val="1">1</button>
+    <button class="number-btn" data-val="2">2</button>
+    <button class="number-btn" data-val="3">3</button>
+    <button class="delete-btn" data-val="DEL">⌫</button>
+
+    <button class="number-btn" data-val="4">4</button>
+    <button class="number-btn" data-val="5">5</button>
+    <button class="number-btn" data-val="6">6</button>
+    <button class="ac-btn" data-val="AC">AC</button>
+
+    <button class="number-btn" data-val="7">7</button>
+    <button class="number-btn" data-val="8">8</button>
+    <button class="number-btn" data-val="9">9</button>
+    <div></div>
+
+    <!-- Нижний ряд с 0 по центру -->
+    <div></div>
+    <button class="number-btn" data-val="0">0</button>
+    <div></div>
+    <div></div>
+</div>
+
+<!-- Операторы -->
+<div class="operators-row">
+  <button class="operator-btn" data-val="+">+</button>
+  <button class="operator-btn" data-val="-">-</button>
+  <button class="operator-btn" data-val="*">×</button>
+  <button class="operator-btn" data-val="/">:</button>
+  <button class="operator-btn" data-val=".">.</button>
+  <button class="equal-btn" data-val="=">=</button>
+</div>
+
+<div id="currency">Валюта <span class="triangle">▼</span></div>
+
+<div id="converter">
+  <input id="currencyInput" type="number" placeholder="Введите сумму">
+  <select id="currencyType">
+    <option value="USD">USD → RUB</option>
+    <option value="EUR">EUR → RUB</option>
+    <option value="CNY">CNY → RUB</option>
+  </select>
+  <button onclick="convertCurrency()">Конвертировать</button>
+  <div id="convertedResult"></div>
+</div>
+
+<script>
+let expression = '';
+const display = document.getElementById('display');
+const converter = document.getElementById('converter');
+
+function updateDisplay(){ display.textContent = expression || '0'; }
+
+function press(val){
+    if(val==='DEL'){ expression = expression.slice(0,-1); updateDisplay(); return; }
+    if(val==='AC'){ expression = ''; updateDisplay(); return; }
+    if(val==='='){
+        try{
+            const expr = expression.replace(/×/g,'*').replace(/:/g,'/');
+            expression = String(Function('return '+expr)());
+        } catch { expression='Ошибка'; }
+        updateDisplay(); return;
+    }
+    if(val==='*') val='×';
+    if(val==='/') val=':';
+    expression += val; updateDisplay();
+}
+
+document.querySelectorAll('button').forEach(btn=>{
+    if(btn.id!=="currency" && btn.parentNode.id!=="converter"){
+        btn.addEventListener('click', ()=>{ press(btn.dataset.val); });
+    }
+});
+
+document.getElementById('currency').addEventListener('click', ()=>{
+    if(converter.style.display==='none' || converter.style.display===''){
+        converter.style.display='block';
+        setTimeout(()=>converter.style.opacity='1',20);
+    } else{
+        converter.style.opacity='0';
+        setTimeout(()=>converter.style.display='none',300);
+    }
+});
+
+const currencyRates={USD:77.717,EUR:90.0,CNY:11.0};
+function convertCurrency(){
+    const amount=parseFloat(document.getElementById('currencyInput').value);
+    const type=document.getElementById('currencyType').value;
+    const output=document.getElementById('convertedResult');
+    if(!amount){ output.innerHTML="Введите корректную сумму"; return; }
+    const rate=currencyRates[type];
+    const result=amount*rate;
+    output.innerHTML=`${amount} ${type} = <b>${result.toFixed(2)} RUB</b>`;
+}
+</script>
+
+</body>
+</html>
+"""
+
+app = QApplication(sys.argv)
+window = QWebEngineView()
+window.setHtml(html_code)
+window.setWindowTitle("Calculatorx")
+window.resize(420, 700)
+window.show()
+sys.exit(app.exec_())
